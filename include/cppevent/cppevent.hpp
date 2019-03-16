@@ -1,36 +1,16 @@
-#ifndef __SIGNAL_HEADER_GUARD__
-#define __SIGNAL_HEADER_GUARD__
+#ifndef __CPPEVENT_HEADER_GUARD__
+#define __CPPEVENT_HEADER_GUARD__
 
-#include <iostream>
-#include <mutex>
-#include <functional>
-#include <limits>
-#include <algorithm>
-#include <map>
-#include <vector>
+#include <mutex>        // for std::mutex
+#include <functional>   // for std::function
+#include <algorithm>    // for std::transform
+#include <map>          // for std::map
+#include <vector>       // for std::vector
+#include <cstdint>      // for std::uintptr_t
+#include <utility>      // for std::pair
 
 namespace cppevent
 {
-    struct integer_token
-    {
-        integer_token(int i) : token(i) {}
-        friend bool operator<(const integer_token& lhs, const integer_token& rhs)
-        {
-            return lhs.token < rhs.token;
-        }
-    private:
-        int token;
-    };
-
-    struct integer_token_generator
-    {
-        integer_token operator()() const
-        {
-            static int g_token = 0;
-            return g_token++;
-        }
-    };
-
     template<typename Ret, typename Token, typename TokenGenerator, typename... Args>
     class signal_impl
     {
@@ -56,7 +36,7 @@ namespace cppevent
         Token subscribe(FuncType&& func)
         {
             std::lock_guard<std::mutex> locker(m_mutex);
-            return m_subscribers.emplace(token_generator(), func).first->first;
+            return m_subscribers.emplace(token_generator(reinterpret_cast<std::uintptr_t>(this)), func).first->first;
         }
 
         bool unsubscribe(Token&& token)
@@ -116,7 +96,7 @@ namespace cppevent
         template<typename Publisher, typename Ret, typename Token, typename TokenGenerator, typename... Args>
         struct _event<Publisher, Ret(Args...), Token, TokenGenerator> : public signal_impl<Ret, Token, TokenGenerator, Args...>
         {
-            friend Publisher; // Allows publisher to raise an event
+            friend Publisher; // allows publisher to raise an event
         private:
             bool operator()(const Args&... args) override // denies from everyone except the publisher from raising an event
             {
@@ -126,39 +106,42 @@ namespace cppevent
 
     }
 
-    /*
-    A multicast delegate with arbitrary argument types
+    struct simple_token_generator
+    {
+        struct simple_token
+        {
+            explicit simple_token(int i, std::uintptr_t id) : m_token(i), m_id(id) {}
+            friend bool operator<(const simple_token& lhs, const simple_token& rhs)
+            {
+                return std::make_pair(lhs.m_token, lhs.m_id) < std::make_pair(rhs.m_token, rhs.m_id);
+            }
+        private:
+            int m_token;
+            std::uintptr_t m_id;
+        };
 
-    Example:
-    signal<void(int, std::string)> s;
-    auto registration_token = (s += [](int i, std::string s) { });
-    s(42, "Hello");
-    s -= registration_token;
+        simple_token operator()(std::uintptr_t id)
+        {
+            return simple_token(token_count++, id);
+        }
+    private:
+        int token_count = 0;
+    };
+
+
+    /*
+        A multicast delegate with arbitrary argument types
     */
-    template <typename F, typename Token = integer_token, typename TokenGenerator = integer_token_generator>
+    template <typename F, typename Token = simple_token_generator::simple_token, typename TokenGenerator = simple_token_generator>
     class signal : public helpers::_signal<F, Token, TokenGenerator>::type {};
 
     /*
-    A multicast delegate with arbitrary argument types that allows only the hosting class to raise events
-
-    Example:
-    struct MyStruct
-    {
-    signal<void(int, std::string)> s;
-    void raise()
-    {
-    s(42, "Hello");
-    }
-    };
-
-    auto registration_token = (s += [](int i, std::string s) { });
-    s(42, "Hello"); //Compilation error
-    s -= registration_token;
+        A multicast delegate with arbitrary argument types that only allows the hosting class to raise events
     */
-    template <typename Publisher, typename F, typename Token = integer_token, typename TokenGenerator = integer_token_generator>
+    template <typename Publisher, typename F, typename Token = simple_token_generator::simple_token, typename TokenGenerator = simple_token_generator>
     class event : public helpers::_event<Publisher, F, Token, TokenGenerator>
     {
         friend Publisher;
     };
 }
-#endif //__SIGNAL_HEADER_GUARD__
+#endif //__CPPEVENT_HEADER_GUARD__
