@@ -1,4 +1,4 @@
-# cppevent
+# cppevent (Work in progress)
 C++ equivalent-ish of .NET event
 
 ## Why use this?
