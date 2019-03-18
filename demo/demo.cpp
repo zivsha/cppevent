@@ -47,7 +47,7 @@ int main()
 
         std::cout << "Register to \"OnChanged\" event and store the token\n";
         auto queue_token =
-            queue.OnChanged += [](int new_size) { std::cout << "New queue size is: " << new_size << std::endl; };
+            queue.OnChanged += [](std::size_t new_size) { std::cout << "New queue size is: " << new_size << std::endl; };
 
         std::cout << "Filling the queue\n";
         for (int i = 0; i < 3; i++)

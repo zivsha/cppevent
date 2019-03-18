@@ -27,10 +27,12 @@ namespace cppevent
         {
             return unsubscribe(std::move(token));
         }
+
         virtual bool operator()(const Args&... args)
         {
             return raise(args...);
         }
+
     private:
 
         Token subscribe(FuncType&& func)

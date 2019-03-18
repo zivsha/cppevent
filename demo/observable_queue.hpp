@@ -10,7 +10,7 @@ namespace cppevent_demo
     {
         std::deque<T> m_deque;
     public:
-        cppevent::event<observable_queue, void(int)> OnChanged;
+        cppevent::event<observable_queue, void(std::size_t)> OnChanged;
 
         void put(const T& t)
         {
